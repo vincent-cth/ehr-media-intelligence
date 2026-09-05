@@ -21,9 +21,13 @@ python scripts/bootstrap.py
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`. The app uses only synthetic records from `data/`.
+Open `http://127.0.0.1:8000`. The app uses only synthetic records.
 
 > If the embedding model is not already cached, the first run downloads `all-MiniLM-L6-v2`. If `OPENAI_API_KEY` is absent, summaries use the low-confidence offline fallback.
+
+## Synthetic demo corpus
+
+`python scripts/bootstrap.py` deterministically generates **62 raw synthetic EHR/media records** across JSON and CSV for **20 synthetic patients**. Two records are deliberate duplicates, so the ingestion/cleaning stage produces **60 unique canonical records**. The generated corpus deliberately contains mixed date formats, missing MRNs, conflicting MRNs, inconsistent gender codes, a missing source identifier, lab results, imaging reports, discharge summaries, and scanned follow-up notes. This lets the evaluator exercise the required cleaning edge cases and also run semantic retrieval on more than the 50-record performance target. **No real patient data is used.**
 
 ## API
 
@@ -53,7 +57,7 @@ Returns the cached AI summary, linked source records, and full FHIR Bundle.
 ## Data pipeline
 
 ```text
-JSON / CSV
+Synthetic JSON / CSV generation
    |
    v
 Pydantic cleaning + audit log
@@ -82,7 +86,7 @@ pytest
 python scripts/benchmark_search.py
 ```
 
-The tests cover inconsistent date/gender/MRN normalization, missing identifiers, duplicate removal, conflicting MRNs, FHIR resource/reference construction, and filtered semantic search. The benchmark constructs 50 synthetic records and asserts a search completes in under two seconds on the active embedding backend.
+The tests cover inconsistent date/gender/MRN normalization, missing identifiers, duplicate removal, conflicting MRNs, FHIR resource/reference construction, filtered semantic search, and the full demo-corpus invariant. The benchmark constructs 50 synthetic records and asserts a search completes in under two seconds on the active embedding backend.
 
 ## Key design decisions
 
@@ -91,6 +95,7 @@ The tests cover inconsistent date/gender/MRN normalization, missing identifiers,
 3. **Reference checks beyond schema checks.** FHIR schema validation does not prove that `Patient/...` or `Encounter/...` references resolve within the Bundle, so the project checks both.
 4. **API-first AI with safe demo fallback.** The OpenAI path satisfies the LLM requirement; the offline fallback is explicitly lower confidence and prevents a missing key from making the evaluator unable to run the app.
 5. **FAISS for a small local corpus.** It is simple and fast for the assessment scale; metadata filters are applied after over-retrieval.
+6. **Deterministic synthetic corpus generation.** The assessment data is reproducible, contains no PHI, and intentionally encodes data-quality failures rather than relying on a tiny happy-path fixture.
 
 ## Production improvements
 
