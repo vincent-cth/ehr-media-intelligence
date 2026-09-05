@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from .config import settings
+from .demo_corpus import write_demo_corpus
 from .fhir_mapper import build_bundles, validate_bundle
 from .ingestion import ingest_files
 from .search import build_index_from_store
@@ -12,7 +11,8 @@ from .summarizer import summarize_bundle
 
 def bootstrap_demo(store: SQLiteStore | None = None) -> dict[str, int]:
     store = store or SQLiteStore(settings.db_path)
-    records = ingest_files([Path("data/sample_ehr.json"), Path("data/sample_notes.csv")])
+    json_path, csv_path = write_demo_corpus()
+    records = ingest_files([json_path, csv_path])
     store.save_records(records)
     bundles = build_bundles(records)
     for patient_id, bundle in bundles.items():
