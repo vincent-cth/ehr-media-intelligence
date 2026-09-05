@@ -17,6 +17,7 @@ class Settings:
     search_metadata_path: Path = Path(os.getenv("SEARCH_METADATA_PATH", "artifacts/search_metadata.json"))
     summary_cache_path: Path = Path(os.getenv("SUMMARY_CACHE_PATH", "artifacts/summary_cache.json"))
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+    openai_base_url: str | None = os.getenv("OPENAI_BASE_URL") or None
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     demo_mode: bool = os.getenv("DEMO_MODE", "true").lower() in {"1", "true", "yes"}
 

@@ -41,7 +41,7 @@ def summarize_bundle(patient_id: str, bundle: dict[str, Any], store: SQLiteStore
     if api_key:
         try:
             from openai import OpenAI
-            client = OpenAI(api_key=api_key)
+            client = OpenAI(api_key=api_key, base_url=settings.openai_base_url)
             response = client.chat.completions.create(model=settings.openai_model,temperature=0,response_format={"type": "json_object"},messages=[{"role": "system", "content": SYSTEM_PROMPT},{"role": "user", "content": f"Patient ID: {patient_id}\nFHIR media text:\n{text[:12000]}"}])
             payload = json.loads(response.choices[0].message.content or "{}")
             summary = ClinicalSummary(patient_id=patient_id, **payload)

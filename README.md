@@ -1,12 +1,12 @@
 # EHR Media Intelligence Platform
 
-AI full-stack assessment implementation: Python/FastAPI backend, Pydantic cleaning layer, HL7 FHIR resources, OpenAI clinical summarization, sentence-transformer + FAISS semantic search, SQLite persistence, and a Tailwind clinician-facing UI. **All included records are synthetic.**
+AI full-stack assessment implementation: Python/FastAPI backend, Pydantic cleaning layer, HL7 FHIR resources, OpenAI-compatible clinical summarization, sentence-transformer + FAISS semantic search, SQLite persistence, and a Tailwind clinician-facing UI. **All included records are synthetic.**
 
 ## What is implemented
 
 - **Task 1 - ingestion & cleaning:** JSON and CSV/TXT ingestion; missing-field handling; multiple date formats; duplicate removal; MRN/gender/DOB normalization; identity-conflict resolution; Pydantic intermediate models; per-record audit log; pytest edge cases.
 - **Task 2 - FHIR R4 normalization:** Patient, Encounter, DocumentReference, and DiagnosticReport resources; patient-level Bundle; subject/encounter references; `fhir.resources` R4B compatibility models plus explicit reference-integrity checks; SQLite Bundle storage.
-- **Task 3 - AI summarization:** OpenAI API integration with JSON-constrained prompt, <200-word design target, patient+Bundle-hash caching, confidence and non-clinical-decision disclaimer. A low-confidence extractive fallback keeps the demo runnable when no API key is configured.
+- **Task 3 - AI summarization:** OpenAI-compatible API integration with JSON-constrained prompt, <200-word design target, patient+Bundle-hash caching, confidence and non-clinical-decision disclaimer. A low-confidence extractive fallback keeps the demo runnable when no API key is configured.
 - **Task 4 - semantic search:** `sentence-transformers/all-MiniLM-L6-v2` embeddings, FAISS inner-product index, `POST /search`, top-5 ranking, FHIR resource/date filters, persistent index metadata.
 - **Task 5 - frontend:** Tailwind CSS + vanilla JS; realtime search; ranked result cards; patient summary/FHIR detail modal; date/resource filters; responsive/empty/loading states; keyboard-focusable results and ARIA labels.
 
@@ -23,7 +23,7 @@ uvicorn app.main:app --reload
 
 Open `http://127.0.0.1:8000`. The app uses only synthetic records from `data/`.
 
-> If the embedding model is not already cached, the first run downloads `all-MiniLM-L6-v2`. If `OPENAI_API_KEY` is absent, summaries use the low-confidence offline fallback.
+> If the embedding model is not already cached, the first run downloads `all-MiniLM-L6-v2`. If `OPENAI_API_KEY` is absent, summaries use the low-confidence offline fallback. `OPENAI_BASE_URL` can point the OpenAI SDK at a compatible provider such as DeepSeek.
 
 ## API
 
@@ -64,7 +64,7 @@ Patient-level FHIR Bundle
    |
    +----> SQLite
    |
-   +----> OpenAI summary -> hash cache
+   +----> OpenAI-compatible summary -> hash cache
    |
    +----> SentenceTransformer -> FAISS
                               |
