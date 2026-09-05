@@ -22,7 +22,10 @@ class Embedder:
         try:
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer(self.model_name)
-            self.dimension = int(self._model.get_sentence_embedding_dimension())
+            get_dimension = getattr(self._model, "get_embedding_dimension", None)
+            if get_dimension is None:
+                get_dimension = self._model.get_sentence_embedding_dimension
+            self.dimension = int(get_dimension())
         except Exception:
             self._model = None
 

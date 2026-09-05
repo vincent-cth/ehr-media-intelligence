@@ -12,16 +12,31 @@ AI full-stack assessment implementation: Python/FastAPI backend, Pydantic cleani
 
 ## Quick start
 
+### Windows PowerShell
+
 ```bash
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-python scripts/bootstrap.py
-uvicorn app.main:app --reload
+Copy-Item .env.example .env
+# Fill OPENAI_API_KEY in .env with your DeepSeek API key.
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe scripts\bootstrap.py
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`. The app uses only synthetic records from `data/`.
+### macOS / Linux
+
+```bash
+python3 -m venv .venv
+cp .env.example .env
+# Fill OPENAI_API_KEY in .env with your DeepSeek API key.
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python scripts/bootstrap.py
+.venv/bin/python -m uvicorn app.main:app --reload
+```
+
+Open `http://127.0.0.1:8000`. Stop the server with `Ctrl+C`. The app uses only synthetic records from `data/`.
+
+The first bootstrap or server start downloads `sentence-transformers/all-MiniLM-L6-v2` and can take a minute. Later starts use the local model cache. Keep `.env` local; it is excluded by `.gitignore` and must not be committed.
 
 > If the embedding model is not already cached, the first run downloads `all-MiniLM-L6-v2`. If `OPENAI_API_KEY` is absent, summaries use the low-confidence offline fallback. `OPENAI_BASE_URL` can point the OpenAI SDK at a compatible provider such as DeepSeek.
 
