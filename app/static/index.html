@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EHR Media Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>dialog::backdrop{background:rgba(15,23,42,.55)}</style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <main class="mx-auto max-w-6xl px-4 py-10">
+    <header class="mb-8">
+      <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-800">Synthetic demo data only</div>
+      <h1 class="text-3xl font-semibold tracking-tight">EHR Media Intelligence</h1>
+      <p class="mt-2 max-w-3xl text-slate-600">Search normalized FHIR media records and review concise AI-assisted summaries. This demo is not a clinical decision system.</p>
+    </header>
+
+    <section aria-labelledby="search-heading" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 id="search-heading" class="sr-only">Clinical record search</h2>
+      <form id="searchForm" class="grid gap-3 md:grid-cols-[1fr_auto]">
+        <label class="relative">
+          <span class="sr-only">Search patient records</span>
+          <input id="query" required autocomplete="off" class="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 outline-none ring-teal-600 focus:ring-2" placeholder="e.g. chest imaging with opacity, elevated creatinine, discharge summary">
+        </label>
+        <button class="rounded-xl bg-slate-900 px-6 py-3 font-medium text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500">Search</button>
+      </form>
+      <div class="mt-4 grid gap-3 sm:grid-cols-3">
+        <label class="text-sm font-medium">Resource type
+          <select id="resourceType" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+            <option value="all">All resources</option><option>DocumentReference</option><option>DiagnosticReport</option>
+          </select>
+        </label>
+        <label class="text-sm font-medium">From date<input id="dateFrom" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+        <label class="text-sm font-medium">To date<input id="dateTo" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+      </div>
+    </section>
+
+    <div id="status" class="py-5 text-sm text-slate-500" role="status" aria-live="polite">Enter a query to search synthetic records.</div>
+    <section id="results" aria-label="Search results" class="grid gap-4"></section>
+  </main>
+
+  <dialog id="detailDialog" class="w-[min(860px,94vw)] rounded-2xl p-0 shadow-2xl">
+    <div class="flex items-center justify-between border-b px-6 py-4">
+      <h2 id="detailTitle" class="text-xl font-semibold">Patient detail</h2>
+      <button id="closeDialog" aria-label="Close patient detail" class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Close</button>
+    </div>
+    <div id="detailBody" class="max-h-[75vh] overflow-y-auto p-6"></div>
+  </dialog>
+
+<script>
+const form = document.getElementById('searchForm');
+const results = document.getElementById('results');
+const status = document.getElementById('status');
+const dialog = document.getElementById('detailDialog');
+const body = document.getElementById('detailBody');
+const esc = (s='') => String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault(); results.innerHTML=''; status.textContent='Searching…';
+  const q=document.getElementById('query').value.trim();
+  const params=new URLSearchParams();
+  const rt=document.getElementById('resourceType').value; if(rt!=='all') params.set('resource_type',rt);
+  const df=document.getElementById('dateFrom').value; if(df) params.set('date_from',df);
+  const dt=document.getElementById('dateTo').value; if(dt) params.set('date_to',dt);
+  try {
+    const r=await fetch('/search?'+params.toString(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+    if(!r.ok) throw new Error('Search request failed');
+    const data=await r.json(); status.textContent=data.count ? `${data.count} ranked result${data.count===1?'':'s'}` : 'No matching records. Try a broader clinical phrase.';
+    results.innerHTML=data.results.map((x,i)=>`
+      <article tabindex="0" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-600">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div><p class="text-sm text-slate-500">#${i+1} · ${esc(x.record_date?.slice(0,10) || 'Date unavailable')}</p><h3 class="mt-1 text-lg font-semibold">${esc(x.title)}</h3><p class="text-sm text-slate-600">${esc(x.patient_name)} · MRN ${esc(x.mrn)}</p></div>
+          <div class="flex gap-2"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">${esc(x.resource_type)}</span><span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">score ${Number(x.score).toFixed(3)}</span></div>
+        </div>
+        <p class="mt-4 text-sm leading-6 text-slate-700">${esc(x.snippet)}</p>
+        <button data-patient="${esc(x.patient_id)}" class="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50">View summary & FHIR resources</button>
+      </article>`).join('');
+  } catch(err) { status.textContent='Search failed. Check that the API is running and try again.'; }
+});
+
+results.addEventListener('click', async (e)=>{
+  const btn=e.target.closest('[data-patient]'); if(!btn) return;
+  body.innerHTML='<p class="text-slate-500">Loading patient details…</p>'; dialog.showModal();
+  const r=await fetch('/patients/'+encodeURIComponent(btn.dataset.patient)); const d=await r.json();
+  const s=d.summary || {};
+  body.innerHTML=`<div class="space-y-6">
+    <section><h3 class="font-semibold">AI summary</h3><p class="mt-2 leading-7 text-slate-700">${esc(s.narrative || 'Summary unavailable')}</p><p class="mt-2 text-xs text-amber-700">${esc(s.disclaimer || '')}</p></section>
+    <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Chief concern</h3><p class="mt-1 text-sm text-slate-700">${esc(s.chief_concern || 'Not stated')}</p></div><div><h3 class="font-semibold">Key diagnoses</h3><p class="mt-1 text-sm text-slate-700">${esc((s.key_diagnoses || []).join('; ') || 'None explicitly stated')}</p></div></section>
+    <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Recent media records</h3><ul class="mt-1 list-disc pl-5 text-sm text-slate-700">${(s.recent_media_records || []).map(x=>`<li>${esc(x)}</li>`).join('') || '<li>None listed</li>'}</ul></div><div><h3 class="font-semibold">Flagged anomalies</h3><p class="mt-1 text-sm text-slate-700">${esc((s.flagged_anomalies || []).join('; ') || 'None flagged')}</p></div></section>
+    <section><h3 class="font-semibold">Linked FHIR resources</h3><div class="mt-2 flex flex-wrap gap-2">${(d.fhir_bundle?.entry || []).map(e=>`<span class="rounded-full bg-slate-100 px-3 py-1 text-xs">${esc(e.resource.resourceType)}/${esc(e.resource.id)}</span>`).join('')}</div></section>
+    <details><summary class="cursor-pointer font-medium">FHIR Bundle JSON</summary><pre class="mt-3 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">${esc(JSON.stringify(d.fhir_bundle,null,2))}</pre></details>
+  </div>`;
+});
+document.getElementById('closeDialog').addEventListener('click',()=>dialog.close());
+dialog.addEventListener('click',(e)=>{ if(e.target===dialog) dialog.close(); });
+</script>
+</body>
+</html>
