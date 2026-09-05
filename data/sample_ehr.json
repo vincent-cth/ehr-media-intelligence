@@ -1,0 +1,24 @@
+{
+  "records": [
+    {
+      "id": "doc-1001", "patient_name": "avery demo", "mrn": "12-34-56", "dob": "03/14/1985", "gender": "F",
+      "record_date": "2026-03-03T09:15:00", "type": "discharge note", "title": "Emergency Department Discharge Summary",
+      "encounter_id": "enc-100", "text": "Chief concern: persistent cough and fever for four days. Discharged with supportive-care instructions. Return precautions reviewed."
+    },
+    {
+      "id": "lab-1002", "patient_name": "Avery Demo", "patient_id": "00123456", "dob": "1985-03-14", "sex": "female",
+      "date": "03/03/2026", "record_type": "lab result", "title": "Basic Metabolic Panel", "code": "24321-2", "encounter_id": "enc-100",
+      "text": "Sodium 139 mmol/L. Potassium 4.1 mmol/L. Creatinine 1.4 mg/dL, flagged high by the reporting laboratory."
+    },
+    {
+      "id": "img-2001", "patient_name": "Jordan Sample", "mrn": "MRN-77-002", "dob": "1979/11/02", "gender": "M",
+      "timestamp": "2026-02-18T14:30:00Z", "record_type": "imaging report", "title": "Chest X-ray Report", "encounter_id": "visit-77",
+      "text": "Portable chest radiograph. Mild left basilar opacity is described. No pleural effusion reported. Correlate clinically."
+    },
+    {
+      "id": "img-2001-duplicate", "patient_name": "Jordan Sample", "mrn": "MRN-77-002", "dob": "1979/11/02", "gender": "M",
+      "timestamp": "2026-02-18T14:30:00Z", "record_type": "imaging report", "title": "Chest X-ray Report", "encounter_id": "visit-77",
+      "text": "Portable chest radiograph. Mild left basilar opacity is described. No pleural effusion reported. Correlate clinically."
+    }
+  ]
+}

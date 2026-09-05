@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+*.db
+*.sqlite3
+artifacts/faiss.index
+artifacts/search_metadata.json
+artifacts/summary_cache.json
+.DS_Store
