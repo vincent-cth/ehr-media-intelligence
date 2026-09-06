@@ -87,27 +87,53 @@ class SemanticIndex:
         if not query.strip() or not self.metadata:
             return []
         q = self.embedder.encode([query])[0]
-        if self._index is not None:
-            scores, indices = self._index.search(q.reshape(1, -1), min(max(top_k * 8, 20), len(self.metadata)))
+        eligible: list[int] = []
+        for idx, record in enumerate(self.metadata):
+            if resource_type and resource_type != "all" and record.get("resource_type") != resource_type:
+                continue
+            record_date = record.get("record_date")
+            if (date_from or date_to) and not record_date:
+                continue
+            day = record_date[:10] if record_date else None
+            if date_from and day and day < date_from:
+                continue
+            if date_to and day and day > date_to:
+                continue
+            eligible.append(idx)
+
+        if not eligible:
+            return []
+        has_filters = bool(resource_type and resource_type != "all") or bool(date_from or date_to)
+        if self._index is not None and not has_filters:
+            scores, indices = self._index.search(q.reshape(1, -1), min(top_k, len(self.metadata)))
             candidates = [(int(i), float(s)) for i, s in zip(indices[0], scores[0]) if i >= 0]
         else:
-            scores = self.vectors @ q
-            candidates = sorted(enumerate(scores.tolist()), key=lambda x: x[1], reverse=True)
+            filtered_scores = self.vectors[eligible] @ q
+            candidates = sorted(
+                zip(eligible, filtered_scores.tolist()), key=lambda item: item[1], reverse=True
+            )[:top_k]
 
         hits: list[SearchHit] = []
         for idx, score in candidates:
             r = self.metadata[idx]
-            if resource_type and resource_type != "all" and r.get("resource_type") != resource_type:
-                continue
             rd = r.get("record_date")
-            if rd:
-                day = rd[:10]
-                if date_from and day < date_from:
-                    continue
-                if date_to and day > date_to:
-                    continue
-            snippet = re.sub(r"\s+", " ", r.get("text", "")).strip()
-            hits.append(SearchHit(patient_id=r["patient_id"], patient_name=r.get("patient_name", "Unknown"), mrn=r["patient_id"],record_id=r["record_id"], record_date=rd, resource_type=r["resource_type"], title=r["title"],score=round(max(-1.0, min(1.0, float(score))), 4), snippet=snippet[:260]))
+            record_excerpt = re.sub(r"\s+", " ", r.get("text", "")).strip()
+            summary_snippet = re.sub(r"\s+", " ", r.get("summary_snippet", "")).strip()
+            snippet = summary_snippet or "AI summary unavailable; showing source record excerpt."
+            hits.append(
+                SearchHit(
+                    patient_id=r["patient_id"],
+                    patient_name=r.get("patient_name", "Unknown"),
+                    mrn=r["patient_id"],
+                    record_id=r["record_id"],
+                    record_date=rd,
+                    resource_type=r["resource_type"],
+                    title=r["title"],
+                    score=round(max(-1.0, min(1.0, float(score))), 4),
+                    snippet=snippet[:320],
+                    record_excerpt=record_excerpt[:320],
+                )
+            )
             if len(hits) >= top_k:
                 break
         return hits

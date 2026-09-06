@@ -46,6 +46,8 @@ class ClinicalSummary(BaseModel):
     narrative: str
     confidence: Literal["low", "medium", "high"]
     disclaimer: str = "AI-generated summary for information retrieval only; not a clinical decision or diagnosis."
+    generation_method: Literal["llm", "extractive_fallback"] = "extractive_fallback"
+    model: str | None = None
 
 
 class SearchHit(BaseModel):
@@ -58,3 +60,4 @@ class SearchHit(BaseModel):
     title: str
     score: float
     snippet: str
+    record_excerpt: str

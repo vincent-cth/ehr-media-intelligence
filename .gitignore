@@ -5,7 +5,5 @@ __pycache__/
 .env
 *.db
 *.sqlite3
-artifacts/faiss.index
-artifacts/search_metadata.json
-artifacts/summary_cache.json
+artifacts/
 .DS_Store

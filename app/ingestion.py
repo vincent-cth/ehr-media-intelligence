@@ -5,7 +5,7 @@ import hashlib
 import io
 import json
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -55,17 +55,19 @@ def parse_datetime(value: Any) -> datetime | None:
     if value in (None, "", "null"):
         return None
     if isinstance(value, datetime):
-        return value
+        parsed = value
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
     if isinstance(value, date):
-        return datetime.combine(value, datetime.min.time())
+        return datetime.combine(value, datetime.min.time(), tzinfo=timezone.utc)
     text = str(value).strip()
     for fmt in DATE_FORMATS:
         try:
-            return datetime.strptime(text, fmt)
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             pass
     try:
-        return datetime.fromisoformat(text.replace("Z", "+00:00")).replace(tzinfo=None)
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
     except ValueError:
         return None
 

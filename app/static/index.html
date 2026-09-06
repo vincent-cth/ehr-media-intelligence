@@ -3,96 +3,181 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Search synthetic EHR media normalized to FHIR R4.">
   <title>EHR Media Intelligence</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>dialog::backdrop{background:rgba(15,23,42,.55)}</style>
+  <style>
+    dialog::backdrop { background: rgba(15, 23, 42, .62); backdrop-filter: blur(3px); }
+    .spinner { border: 2px solid currentColor; border-right-color: transparent; border-radius: 9999px; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-900">
-  <main class="mx-auto max-w-6xl px-4 py-10">
-    <header class="mb-8">
-      <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-medium text-teal-800">Synthetic demo data only</div>
-      <h1 class="text-3xl font-semibold tracking-tight">EHR Media Intelligence</h1>
-      <p class="mt-2 max-w-3xl text-slate-600">Search normalized FHIR media records and review concise AI-assisted summaries. This demo is not a clinical decision system.</p>
+<body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
+  <div class="border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-900">
+    Synthetic demonstration data only · AI output is not a clinical decision or diagnosis
+  </div>
+
+  <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+    <header class="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div>
+        <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-800 ring-1 ring-inset ring-teal-200">
+          <span class="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true"></span>
+          FHIR R4 clinical media search
+        </div>
+        <h1 class="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">EHR Media Intelligence</h1>
+        <p class="mt-2 max-w-2xl leading-7 text-slate-600">Find relevant notes, imaging reports, and labs in seconds, then review source-linked AI summaries.</p>
+      </div>
+      <dl id="metrics" class="grid grid-cols-3 gap-2 text-center" aria-label="Dataset status">
+        <div class="rounded-xl border bg-white px-4 py-2"><dt class="text-xs text-slate-500">Patients</dt><dd id="patientCount" class="text-lg font-bold">—</dd></div>
+        <div class="rounded-xl border bg-white px-4 py-2"><dt class="text-xs text-slate-500">Records</dt><dd id="recordCount" class="text-lg font-bold">—</dd></div>
+        <div class="rounded-xl border bg-white px-4 py-2"><dt class="text-xs text-slate-500">FHIR valid</dt><dd id="fhirCount" class="text-lg font-bold">—</dd></div>
+      </dl>
     </header>
 
-    <section aria-labelledby="search-heading" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 id="search-heading" class="sr-only">Clinical record search</h2>
-      <form id="searchForm" class="grid gap-3 md:grid-cols-[1fr_auto]">
+    <section aria-labelledby="search-heading" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <h2 id="search-heading" class="text-lg font-semibold">Search patient media</h2>
+      <p id="searchHelp" class="mt-1 text-sm text-slate-500">Search runs automatically after two characters, or press Enter.</p>
+      <form id="searchForm" class="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]" role="search">
         <label class="relative">
           <span class="sr-only">Search patient records</span>
-          <input id="query" required autocomplete="off" class="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 outline-none ring-teal-600 focus:ring-2" placeholder="e.g. chest imaging with opacity, elevated creatinine, discharge summary">
+          <svg class="pointer-events-none absolute left-4 top-3.5 h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input id="query" required autocomplete="off" aria-describedby="searchHelp" class="w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4 outline-none ring-teal-600 placeholder:text-slate-400 focus:ring-2" placeholder="e.g. chest opacity, elevated creatinine, persistent cough">
         </label>
-        <button class="rounded-xl bg-slate-900 px-6 py-3 font-medium text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500">Search</button>
+        <button id="searchButton" class="inline-flex min-w-28 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 font-semibold text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-70">
+          <span id="searchSpinner" class="spinner hidden h-4 w-4" aria-hidden="true"></span><span>Search</span>
+        </button>
+        <button id="clearButton" type="button" class="rounded-xl border border-slate-300 px-5 py-3 font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500">Clear</button>
       </form>
       <div class="mt-4 grid gap-3 sm:grid-cols-3">
-        <label class="text-sm font-medium">Resource type
-          <select id="resourceType" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
-            <option value="all">All resources</option><option>DocumentReference</option><option>DiagnosticReport</option>
+        <label class="text-sm font-medium text-slate-700">Resource type
+          <select id="resourceType" class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 focus:ring-2 focus:ring-teal-600">
+            <option value="">All resources</option><option>DocumentReference</option><option>DiagnosticReport</option>
           </select>
         </label>
-        <label class="text-sm font-medium">From date<input id="dateFrom" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
-        <label class="text-sm font-medium">To date<input id="dateTo" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></label>
+        <label class="text-sm font-medium text-slate-700">From date
+          <input id="dateFrom" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-teal-600">
+        </label>
+        <label class="text-sm font-medium text-slate-700">To date
+          <input id="dateTo" type="date" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:ring-2 focus:ring-teal-600">
+        </label>
       </div>
     </section>
 
-    <div id="status" class="py-5 text-sm text-slate-500" role="status" aria-live="polite">Enter a query to search synthetic records.</div>
-    <section id="results" aria-label="Search results" class="grid gap-4"></section>
+    <div id="status" class="py-5 text-sm text-slate-500" role="status" aria-live="polite">Enter a clinical phrase to search 60 synthetic records.</div>
+    <section id="results" aria-label="Search results" aria-busy="false" class="grid gap-4"></section>
   </main>
 
-  <dialog id="detailDialog" class="w-[min(860px,94vw)] rounded-2xl p-0 shadow-2xl">
-    <div class="flex items-center justify-between border-b px-6 py-4">
-      <h2 id="detailTitle" class="text-xl font-semibold">Patient detail</h2>
-      <button id="closeDialog" aria-label="Close patient detail" class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100">Close</button>
+  <dialog id="detailDialog" aria-labelledby="detailTitle" class="w-[min(920px,94vw)] rounded-2xl p-0 shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 sm:px-6">
+      <div><p class="text-xs font-semibold uppercase tracking-wide text-teal-700">Patient detail</p><h2 id="detailTitle" class="text-xl font-semibold">Clinical summary</h2></div>
+      <button id="closeDialog" aria-label="Close patient detail" class="rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500">Close</button>
     </div>
-    <div id="detailBody" class="max-h-[75vh] overflow-y-auto p-6"></div>
+    <div id="detailBody" class="max-h-[78vh] overflow-y-auto p-5 sm:p-6"></div>
   </dialog>
 
 <script>
 const form = document.getElementById('searchForm');
+const queryInput = document.getElementById('query');
 const results = document.getElementById('results');
 const status = document.getElementById('status');
 const dialog = document.getElementById('detailDialog');
-const body = document.getElementById('detailBody');
-const esc = (s='') => String(s).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const detailBody = document.getElementById('detailBody');
+const searchButton = document.getElementById('searchButton');
+const spinner = document.getElementById('searchSpinner');
+const filters = ['resourceType', 'dateFrom', 'dateTo'].map(id => document.getElementById(id));
+const esc = (value='') => String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+let debounceTimer;
+let activeRequest;
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault(); results.innerHTML=''; status.textContent='Searching…';
-  const q=document.getElementById('query').value.trim();
-  const params=new URLSearchParams();
-  const rt=document.getElementById('resourceType').value; if(rt!=='all') params.set('resource_type',rt);
-  const df=document.getElementById('dateFrom').value; if(df) params.set('date_from',df);
-  const dt=document.getElementById('dateTo').value; if(dt) params.set('date_to',dt);
+function setLoading(loading) {
+  searchButton.disabled = loading;
+  spinner.classList.toggle('hidden', !loading);
+  results.setAttribute('aria-busy', String(loading));
+}
+
+function emptyState(message) {
+  results.innerHTML = `<div class="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center"><p class="font-semibold text-slate-700">No matching records</p><p class="mt-1 text-sm text-slate-500">${esc(message)}</p></div>`;
+}
+
+async function searchRecords() {
+  const query = queryInput.value.trim();
+  if (!query) { results.innerHTML = ''; status.textContent = 'Enter a clinical phrase to search 60 synthetic records.'; return; }
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if (from && to && from > to) { status.textContent = 'From date must be on or before To date.'; emptyState('Correct the date range and try again.'); return; }
+  if (activeRequest) activeRequest.abort();
+  activeRequest = new AbortController();
+  const params = new URLSearchParams();
+  const resourceType = document.getElementById('resourceType').value;
+  if (resourceType) params.set('resource_type', resourceType);
+  if (from) params.set('date_from', from);
+  if (to) params.set('date_to', to);
+  setLoading(true); results.innerHTML = ''; status.textContent = `Searching for “${query}”…`;
   try {
-    const r=await fetch('/search?'+params.toString(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
-    if(!r.ok) throw new Error('Search request failed');
-    const data=await r.json(); status.textContent=data.count ? `${data.count} ranked result${data.count===1?'':'s'}` : 'No matching records. Try a broader clinical phrase.';
-    results.innerHTML=data.results.map((x,i)=>`
-      <article tabindex="0" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-600">
+    const response = await fetch('/search?' + params, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query}), signal:activeRequest.signal});
+    if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.detail || 'Search request failed'); }
+    const data = await response.json();
+    status.textContent = data.count ? `${data.count} ranked result${data.count === 1 ? '' : 's'} for “${data.query}”` : `No matches for “${data.query}”`;
+    if (!data.count) { emptyState('Try a broader clinical phrase or remove filters.'); return; }
+    results.innerHTML = data.results.map((item, index) => `
+      <article tabindex="0" data-result-card class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-600">
         <div class="flex flex-wrap items-start justify-between gap-3">
-          <div><p class="text-sm text-slate-500">#${i+1} · ${esc(x.record_date?.slice(0,10) || 'Date unavailable')}</p><h3 class="mt-1 text-lg font-semibold">${esc(x.title)}</h3><p class="text-sm text-slate-600">${esc(x.patient_name)} · MRN ${esc(x.mrn)}</p></div>
-          <div class="flex gap-2"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">${esc(x.resource_type)}</span><span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">score ${Number(x.score).toFixed(3)}</span></div>
+          <div><p class="text-sm text-slate-500">#${index + 1} · ${esc(item.record_date?.slice(0,10) || 'Date unavailable')}</p><h3 class="mt-1 text-lg font-semibold">${esc(item.title)}</h3><p class="text-sm text-slate-600">${esc(item.patient_name)} · MRN ${esc(item.mrn)}</p></div>
+          <div class="flex gap-2"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">${esc(item.resource_type)}</span><span class="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">score ${Number(item.score).toFixed(3)}</span></div>
         </div>
-        <p class="mt-4 text-sm leading-6 text-slate-700">${esc(x.snippet)}</p>
-        <button data-patient="${esc(x.patient_id)}" class="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50">View summary & FHIR resources</button>
+        <div class="mt-4 grid gap-3 md:grid-cols-2"><div class="rounded-xl bg-teal-50/70 p-3"><p class="text-xs font-bold uppercase tracking-wide text-teal-800">AI summary snippet</p><p class="mt-1 text-sm leading-6 text-slate-700">${esc(item.snippet)}</p></div><div class="rounded-xl bg-slate-50 p-3"><p class="text-xs font-bold uppercase tracking-wide text-slate-600">Source record</p><p class="mt-1 text-sm leading-6 text-slate-700">${esc(item.record_excerpt)}</p></div></div>
+        <button data-patient="${esc(item.patient_id)}" class="mt-4 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-600">View summary, audit &amp; FHIR</button>
       </article>`).join('');
-  } catch(err) { status.textContent='Search failed. Check that the API is running and try again.'; }
+  } catch (error) {
+    if (error.name !== 'AbortError') { status.textContent = `Search failed: ${error.message}`; emptyState('Check that the API is running and try again.'); }
+  } finally { setLoading(false); }
+}
+
+form.addEventListener('submit', event => { event.preventDefault(); clearTimeout(debounceTimer); searchRecords(); });
+queryInput.addEventListener('input', () => { clearTimeout(debounceTimer); if (queryInput.value.trim().length >= 2) debounceTimer = setTimeout(searchRecords, 350); });
+filters.forEach(filter => filter.addEventListener('change', () => { if (queryInput.value.trim()) searchRecords(); }));
+document.getElementById('clearButton').addEventListener('click', () => { queryInput.value=''; filters.forEach(f => f.value=''); results.innerHTML=''; status.textContent='Enter a clinical phrase to search 60 synthetic records.'; queryInput.focus(); });
+
+results.addEventListener('keydown', event => {
+  const cards = [...results.querySelectorAll('[data-result-card]')];
+  const index = cards.indexOf(document.activeElement);
+  if (index < 0) return;
+  if (event.key === 'ArrowDown') { event.preventDefault(); cards[Math.min(index + 1, cards.length - 1)].focus(); }
+  if (event.key === 'ArrowUp') { event.preventDefault(); cards[Math.max(index - 1, 0)].focus(); }
+  if (event.key === 'Enter') document.activeElement.querySelector('[data-patient]')?.click();
 });
 
-results.addEventListener('click', async (e)=>{
-  const btn=e.target.closest('[data-patient]'); if(!btn) return;
-  body.innerHTML='<p class="text-slate-500">Loading patient details…</p>'; dialog.showModal();
-  const r=await fetch('/patients/'+encodeURIComponent(btn.dataset.patient)); const d=await r.json();
-  const s=d.summary || {};
-  body.innerHTML=`<div class="space-y-6">
-    <section><h3 class="font-semibold">AI summary</h3><p class="mt-2 leading-7 text-slate-700">${esc(s.narrative || 'Summary unavailable')}</p><p class="mt-2 text-xs text-amber-700">${esc(s.disclaimer || '')}</p></section>
-    <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Chief concern</h3><p class="mt-1 text-sm text-slate-700">${esc(s.chief_concern || 'Not stated')}</p></div><div><h3 class="font-semibold">Key diagnoses</h3><p class="mt-1 text-sm text-slate-700">${esc((s.key_diagnoses || []).join('; ') || 'None explicitly stated')}</p></div></section>
-    <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Recent media records</h3><ul class="mt-1 list-disc pl-5 text-sm text-slate-700">${(s.recent_media_records || []).map(x=>`<li>${esc(x)}</li>`).join('') || '<li>None listed</li>'}</ul></div><div><h3 class="font-semibold">Flagged anomalies</h3><p class="mt-1 text-sm text-slate-700">${esc((s.flagged_anomalies || []).join('; ') || 'None flagged')}</p></div></section>
-    <section><h3 class="font-semibold">Linked FHIR resources</h3><div class="mt-2 flex flex-wrap gap-2">${(d.fhir_bundle?.entry || []).map(e=>`<span class="rounded-full bg-slate-100 px-3 py-1 text-xs">${esc(e.resource.resourceType)}/${esc(e.resource.id)}</span>`).join('')}</div></section>
-    <details><summary class="cursor-pointer font-medium">FHIR Bundle JSON</summary><pre class="mt-3 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">${esc(JSON.stringify(d.fhir_bundle,null,2))}</pre></details>
-  </div>`;
+results.addEventListener('click', async event => {
+  const button = event.target.closest('[data-patient]'); if (!button) return;
+  detailBody.innerHTML = '<div class="flex items-center gap-3 text-slate-500"><span class="spinner h-5 w-5" aria-hidden="true"></span>Loading patient details…</div>';
+  dialog.showModal();
+  try {
+    const response = await fetch('/patients/' + encodeURIComponent(button.dataset.patient));
+    if (!response.ok) throw new Error('Patient detail request failed');
+    const data = await response.json(); const summary = data.summary || {}; const patient = data.patient || {};
+    document.getElementById('detailTitle').textContent = `${patient.name || 'Patient'} · ${patient.patient_id || ''}`;
+    const validation = data.fhir_validation || {valid:false, errors:['Validation status unavailable']};
+    const auditSections = (data.records || []).map(record => `<details class="rounded-xl border border-slate-200 p-3"><summary class="cursor-pointer font-medium">${esc(record.title)} <span class="font-normal text-slate-500">· ${(record.audit_log || []).length} audit events</span></summary><ul class="mt-2 space-y-1 text-sm text-slate-600">${(record.audit_log || []).map(a => `<li><strong>${esc(a.field)}</strong>: ${esc(a.action)}${a.before != null ? ` · ${esc(a.before)} → ${esc(a.after || 'missing')}` : ''}</li>`).join('') || '<li>No normalization changes required.</li>'}</ul></details>`).join('');
+    detailBody.innerHTML = `<div class="space-y-6">
+      <section class="rounded-xl bg-slate-50 p-4"><div class="flex flex-wrap items-center justify-between gap-2"><h3 class="font-semibold">AI clinical summary</h3><div class="flex gap-2"><span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold ring-1 ring-slate-200">${esc(summary.confidence || 'unknown')} confidence</span><span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold ring-1 ring-slate-200">${esc(summary.generation_method || 'unknown')}</span></div></div><p class="mt-3 leading-7 text-slate-700">${esc(summary.narrative || 'Summary unavailable')}</p><p class="mt-3 text-xs font-medium text-amber-800">${esc(summary.disclaimer || 'AI-generated; not for clinical decisions.')}</p></section>
+      <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Chief concern</h3><p class="mt-1 text-sm leading-6 text-slate-700">${esc(summary.chief_concern || 'Not stated')}</p></div><div><h3 class="font-semibold">Key diagnoses</h3><p class="mt-1 text-sm leading-6 text-slate-700">${esc((summary.key_diagnoses || []).join('; ') || 'None explicitly stated')}</p></div></section>
+      <section class="grid gap-4 sm:grid-cols-2"><div><h3 class="font-semibold">Recent media records</h3><ul class="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">${(summary.recent_media_records || []).map(x => `<li>${esc(x)}</li>`).join('') || '<li>None listed</li>'}</ul></div><div><h3 class="font-semibold">Flagged anomalies</h3><ul class="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">${(summary.flagged_anomalies || []).map(x => `<li>${esc(x)}</li>`).join('') || '<li>None flagged</li>'}</ul></div></section>
+      <section><div class="flex items-center justify-between gap-3"><h3 class="font-semibold">FHIR R4 resources</h3><span class="rounded-full px-2.5 py-1 text-xs font-bold ${validation.valid ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}">${validation.valid ? 'Validated' : 'Validation errors'}</span></div><div class="mt-2 flex flex-wrap gap-2">${(data.fhir_bundle?.entry || []).map(entry => `<span class="rounded-full bg-slate-100 px-3 py-1 text-xs">${esc(entry.resource.resourceType)}/${esc(entry.resource.id)}</span>`).join('')}</div>${validation.errors?.length ? `<ul class="mt-2 text-sm text-red-700">${validation.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}</section>
+      <section><h3 class="font-semibold">Cleaning audit trail</h3><div class="mt-2 space-y-2">${auditSections}</div></section>
+      <details><summary class="cursor-pointer font-semibold">View full FHIR Bundle JSON</summary><pre class="mt-3 max-h-96 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">${esc(JSON.stringify(data.fhir_bundle, null, 2))}</pre></details>
+    </div>`;
+  } catch (error) { detailBody.innerHTML = `<p class="rounded-xl bg-red-50 p-4 text-red-800">${esc(error.message)}</p>`; }
 });
-document.getElementById('closeDialog').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('click',(e)=>{ if(e.target===dialog) dialog.close(); });
+
+document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
+dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+document.addEventListener('keydown', event => { if (event.key === '/' && document.activeElement.tagName !== 'INPUT') { event.preventDefault(); queryInput.focus(); } });
+
+fetch('/health').then(response => response.json()).then(data => {
+  document.getElementById('patientCount').textContent = data.patients ?? '—';
+  document.getElementById('recordCount').textContent = data.records ?? '—';
+  document.getElementById('fhirCount').textContent = `${data.valid_bundles ?? 0}/${data.bundles ?? 0}`;
+}).catch(() => {});
 </script>
 </body>
 </html>

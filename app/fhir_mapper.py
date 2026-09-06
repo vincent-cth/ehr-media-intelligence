@@ -104,18 +104,29 @@ def build_bundles(records: list[CleanRecord]) -> dict[str, dict[str, Any]]:
 
 
 def validate_bundle(bundle: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Validate against exact FHIR R4 models, R4B/Pydantic, and local references."""
     errors: list[str] = []
     try:
+        from fhirclient.models.bundle import Bundle as R4Bundle
+
+        R4Bundle(bundle).as_json()
+    except ImportError:
+        errors.append("FHIR R4 validator unavailable: install fhirclient>=4.2")
+    except Exception as exc:
+        errors.append(f"FHIR R4 schema: {exc}")
+
+    try:
         from fhir.resources.R4B.bundle import Bundle
+
         validator = getattr(Bundle, "model_validate", None)
         if validator:
             validator(bundle)
         else:
             Bundle.parse_obj(bundle)
     except ImportError:
-        return False, ["fhir.resources is not installed; run pip install -r requirements.txt"]
+        errors.append("FHIR R4B/Pydantic validator unavailable: install fhir.resources")
     except Exception as exc:
-        errors.append(str(exc))
+        errors.append(f"FHIR R4B schema: {exc}")
 
     resources = [e.get("resource", {}) for e in bundle.get("entry", [])]
     ids = {f"{r.get('resourceType')}/{r.get('id')}" for r in resources if r.get("resourceType") and r.get("id")}
@@ -139,11 +150,19 @@ def validate_bundle(bundle: dict[str, Any]) -> tuple[bool, list[str]]:
 
 
 def validation_report(bundles: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    report: dict[str, Any] = {"valid": True, "patients": {}}
+    report: dict[str, Any] = {
+        "fhir_version": "R4 (4.0.1)",
+        "validators": ["fhirclient R4", "fhir.resources R4B/Pydantic v2", "reference integrity"],
+        "valid": True,
+        "bundle_count": len(bundles),
+        "valid_bundle_count": 0,
+        "patients": {},
+    }
     for patient_id, bundle in bundles.items():
         ok, errors = validate_bundle(bundle)
         report["patients"][patient_id] = {"valid": ok, "errors": errors}
         report["valid"] = report["valid"] and ok
+        report["valid_bundle_count"] += int(ok)
     return report
 
 

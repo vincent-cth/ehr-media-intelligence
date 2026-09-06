@@ -1,4 +1,6 @@
-from app.ingestion import clean_records, normalize_mrn, parse_date
+from datetime import timezone
+
+from app.ingestion import clean_records, normalize_mrn, parse_date, parse_datetime
 
 
 def test_inconsistent_date_and_gender_are_normalized():
@@ -28,3 +30,10 @@ def test_duplicates_removed_and_conflicting_mrn_resolved():
     assert len(cleaned) == 2
     assert cleaned[1].patient.mrn == "00123456"
     assert any("conflicting" in a.action for a in cleaned[1].audit_log)
+
+
+def test_record_datetime_is_normalized_to_fhir_safe_utc():
+    parsed = parse_datetime("2026-03-03T09:15:00")
+    assert parsed is not None
+    assert parsed.tzinfo == timezone.utc
+    assert parsed.isoformat() == "2026-03-03T09:15:00+00:00"
