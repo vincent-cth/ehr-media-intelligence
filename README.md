@@ -14,7 +14,7 @@ An AI full-stack assessment implementation that turns messy synthetic EHR media 
 | Semantic search | `all-MiniLM-L6-v2` embeddings over source text plus AI summaries; FAISS cosine ranking; strict resource/date pre-filtering; top five results with scores and summary/source snippets |
 | Frontend | Debounced real-time search; filters; ranked cards; AI summary snippets; patient modal with full summary, linked FHIR resources, validation status and cleaning audit trail; responsive, loading, error and empty states; ARIA/live regions and keyboard navigation |
 
-The deterministic demo creates **62 raw records**, deliberately including two duplicates and multiple cleaning edge cases. Ingestion produces **60 unique records across 20 synthetic patients**.
+The committed `data/` inputs contain **62 raw records** (41 JSON + 21 CSV), deliberately including two duplicates and multiple cleaning edge cases. Ingestion produces **60 unique records across 20 synthetic patients**, so reviewers can inspect the full evaluation corpus before running the app.
 
 ## Quick start
 
@@ -42,7 +42,7 @@ cp .env.example .env
 
 Open <http://127.0.0.1:8000>. Interactive API documentation is available at <http://127.0.0.1:8000/docs>. Stop the development server with `Ctrl+C`.
 
-The first run downloads `sentence-transformers/all-MiniLM-L6-v2`; later runs use the local Hugging Face cache. `.env`, the generated corpus, SQLite database, FHIR report, and FAISS files live outside version control.
+The first run downloads `sentence-transformers/all-MiniLM-L6-v2`; later runs use the local Hugging Face cache. `.env`, the SQLite database, FHIR report, and FAISS files live outside version control. The complete synthetic JSON/CSV source corpus is intentionally tracked in `data/`.
 
 ## LLM configuration
 
@@ -69,7 +69,7 @@ Expected shape:
  'patients': 20, 'valid_bundles': 20, 'indexed_records': 60}
 ```
 
-Bootstrap performs the complete pipeline and fails clearly if any FHIR Bundle is invalid. It writes the detailed validation report to `artifacts/fhir_validation_report.json`.
+Bootstrap reads the committed files in `data/`, performs the complete pipeline, and fails clearly if any FHIR Bundle is invalid. It writes the detailed validation report to `artifacts/fhir_validation_report.json`.
 
 ```text
 generated JSON + CSV
@@ -121,7 +121,7 @@ Tests cover cleaning edge cases, the 60-record corpus, R4 schema/reference valid
 2. **Dual FHIR validation.** `fhirclient` supplies exact R4 4.0.1 models; `fhir.resources` preserves the required Pydantic-v2 workflow through its R4B namespace, which its maintainers position as the supported overlap for R4-era content. Reference resolution is checked separately because schema validation alone cannot prove local targets exist.
 3. **Source-grounded summaries.** The prompt forbids inferred diagnoses, anomaly text must remain tied to reported findings, output has a hard word budget, and the UI always shows the disclaimer and source record beside the summary.
 4. **FAISS with pre-filtering.** Exact metadata filtering precedes ranking so narrow filters still return the true top five. This is simple and fast for assessment scale; production retrieval would add lexical search and reranking.
-5. **Reproducible synthetic evaluation data.** Generated JSON and CSV inputs exercise date, gender, MRN, missing-field, duplicate and identifier-conflict paths without committing real patient data.
+5. **Reproducible synthetic evaluation data.** The fully inspectable JSON and CSV inputs in `data/` exercise date, gender, MRN, missing-field, duplicate and identifier-conflict paths without using real patient data. Regenerate them deterministically with `python scripts/generate_demo_data.py`.
 
 ## Production improvements
 

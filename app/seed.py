@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from .config import settings
-from .demo_corpus import write_demo_corpus
 from .fhir_mapper import build_bundles, validation_report
 from .ingestion import ingest_files, load_csv, load_json
 from .search import build_index_from_store
@@ -14,7 +14,9 @@ from .summarizer import summarize_bundle
 
 def bootstrap_demo(store: SQLiteStore | None = None) -> dict[str, Any]:
     store = store or SQLiteStore(settings.db_path)
-    json_path, csv_path = write_demo_corpus(settings.demo_data_dir)
+    data_dir = Path(__file__).resolve().parents[1] / "data"
+    json_path = data_dir / "sample_ehr.json"
+    csv_path = data_dir / "sample_notes.csv"
     raw_count = len(load_json(json_path)) + len(load_csv(csv_path))
     records = ingest_files([json_path, csv_path])
     store.replace_records(records)

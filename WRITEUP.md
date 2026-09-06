@@ -24,7 +24,7 @@ The system embeds record text and AI narratives with all-MiniLM-L6-v2 and ranks 
 - 20 of 20 patient Bundles pass all validation layers
 - 20 of 20 current summaries generated through the LLM path
 - Longest current clinical summary is 76 words
-- 14 automated tests pass; 50-record search is about 0.006 seconds
+- 15 automated tests pass; 50-record search is about 0.006 seconds
 
 ## 06 Tradeoffs and next steps
 

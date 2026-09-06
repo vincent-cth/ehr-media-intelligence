@@ -175,12 +175,12 @@ def build_raw_demo_records() -> tuple[list[dict[str, str]], list[dict[str, str]]
 
 
 def write_demo_corpus(data_dir: str | Path) -> tuple[Path, Path]:
-    """Write deterministic JSON and CSV inputs outside the tracked source tree."""
+    """Write the deterministic, reviewable JSON and CSV assessment inputs."""
     data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     json_records, csv_records = build_raw_demo_records()
-    json_path = data_dir / "synthetic_ehr.json"
-    csv_path = data_dir / "synthetic_notes.csv"
+    json_path = data_dir / "sample_ehr.json"
+    csv_path = data_dir / "sample_notes.csv"
     json_path.write_text(json.dumps({"records": json_records}, indent=2), encoding="utf-8")
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=CSV_FIELDS)

@@ -172,7 +172,7 @@ def draw_metrics(pdf: canvas.Canvas) -> None:
     metrics = [
         ("60", "UNIQUE RECORDS"),
         ("20/20", "FHIR BUNDLES VALID"),
-        ("14", "AUTOMATED TESTS"),
+        ("15", "AUTOMATED TESTS"),
         ("~0.006s", "50-RECORD SEARCH"),
     ]
     x = 36.0
