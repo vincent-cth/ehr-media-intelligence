@@ -1,19 +1,31 @@
-# EHR Media Intelligence Platform - Short Write-up
+# EHR Media Intelligence Platform
 
-## Design and tradeoffs
+AI Full-stack Internship Assessment | Python, FHIR R4, Clinical AI, Semantic Search
 
-I built a staged, auditable pipeline: heterogeneous JSON/CSV -> Pydantic cleaning -> patient-level FHIR R4 Bundles -> SQLite -> cached AI summaries -> MiniLM/FAISS -> FastAPI/Tailwind UI. The reproducible corpus contains 62 raw synthetic records and deliberately exercises missing fields, inconsistent dates and gender codes, duplicate content, and conflicting identifiers. Cleaning yields 60 unique records across 20 synthetic patients. Name + DOB reconciliation is understandable for a demo, but production identity matching would require a governed master patient index.
+## 01 System design
 
-The FHIR layer creates Patient, Encounter, DocumentReference, and DiagnosticReport resources with resolvable subject/encounter references. Every Bundle is checked three ways: exact R4 4.0.1 models from `fhirclient`, Pydantic-v2 validation through the `fhir.resources` R4B overlap, and custom reference-integrity checks. Errors are stored with each Bundle, written to a JSON report, and exposed through the API/UI. The current corpus validates 20/20 Bundles.
+I built an auditable pipeline from heterogeneous JSON and CSV through Pydantic cleaning, patient-level FHIR R4 Bundles, SQLite persistence, cached clinical summaries, MiniLM/FAISS search, and a FastAPI/Tailwind interface. The deterministic corpus starts with 62 synthetic raw records and exercises missing fields, inconsistent dates and gender codes, duplicate content, and conflicting identifiers. Cleaning produces 60 unique records across 20 patients.
 
-For summarization, an OpenAI-compatible client calls DeepSeek with deterministic, non-thinking JSON output. The prompt permits only source-stated facts, forbids inferred diagnoses, requires chief concern/diagnoses/media/anomalies, and defines confidence as source completeness. Code enforces a 200-word clinical-field ceiling, adds an immutable disclaimer, records the model/generation method, retries empty JSON once, logs failures, and uses a low-confidence extractive fallback. Summaries are cached by patient plus versioned Bundle hash. The current run produced 20/20 LLM summaries; the longest was 76 words.
+## 02 FHIR R4 and auditability
 
-Search embeds record text and AI narrative with `all-MiniLM-L6-v2`, uses normalized vectors and FAISS inner-product ranking, and applies resource/date filters before ranking so narrow filters still receive the true top five. A deterministic hashing embedder is limited to tests/offline fallback. The reproducible 50-record benchmark measured roughly 0.006 seconds on the development machine, excluding one-time model startup.
+The mapper creates Patient, Encounter, DocumentReference, and DiagnosticReport resources with resolvable subject and encounter references. Every Bundle is checked by exact R4 4.0.1 models from fhirclient, Pydantic validation through fhir.resources, and custom reference-integrity checks. Validation results are stored in SQLite, written to JSON, and surfaced through both the API and UI. Every normalization is retained as a per-record AuditEvent.
 
-## FHIR/clinical research and AI validation
+## 03 Clinical AI safety
 
-I reviewed R4 Patient identity, DocumentReference attachment/context, DiagnosticReport conclusion/effective time, Encounter linkage, collection Bundles, and the distinction between schema validity and reference resolution. Summary quality checks currently cover required fields, source-only prompting, structured parsing/retry, total word budget, confidence/disclaimer presence, cache behavior, and visible source records. A production evaluation should add clinician-reviewed synthetic gold summaries and score factual consistency, critical omission, hallucination, anomaly recall, and claim-level provenance.
+An OpenAI-compatible client calls DeepSeek for six-field structured summaries. The prompt permits only source-stated facts, forbids inferred diagnoses, and requires reported anomalies to remain tied to their source. Code enforces a 200-word clinical limit, records confidence/model/generation method, adds a permanent non-clinical-decision disclaimer, retries empty JSON, logs failures, and provides a visibly low-confidence fallback. Caching uses patient ID plus a versioned Bundle hash.
 
-## With more time
+## 04 Search and clinician UX
 
-I would add US Core profile and terminology-server validation, OCR/PDF ingestion, provenance links per summary claim, authentication/RBAC/encryption/audit controls, incremental background indexing, hybrid BM25/vector retrieval with reranking, monitoring, containerization, and a clinician-reviewed evaluation dashboard.
+The system embeds record text and AI narratives with all-MiniLM-L6-v2 and ranks normalized vectors with FAISS. Resource type and date constraints are applied before ranking, preserving the true filtered top five. The responsive UI provides debounced search, ranked cards, AI and source snippets, filters, loading/error/empty states, patient detail, FHIR status, audit trails, ARIA live regions, and keyboard navigation.
+
+## 05 Validation evidence
+
+- 60 unique synthetic records across 20 patients
+- 20 of 20 patient Bundles pass all validation layers
+- 20 of 20 current summaries generated through the LLM path
+- Longest current clinical summary is 76 words
+- 14 automated tests pass; 50-record search is about 0.006 seconds
+
+## 06 Tradeoffs and next steps
+
+Name plus DOB reconciliation is transparent but not a production master patient index. FAISS is ideal at assessment scale, while production search should add lexical retrieval and reranking. Next steps are US Core profiles and terminology services, OCR/PDF ingestion, claim-level provenance, clinician-reviewed factuality and omission scoring, authentication/RBAC/encryption/audit controls, incremental background indexing, observability, and containerized deployment.
